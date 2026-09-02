@@ -25,8 +25,8 @@ This repository is a monorepo.
 |---|---|
 | `firmware/` | Full git subtree of [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32). The custom StackChan board lives at `firmware/main/boards/stackchan/`. |
 | `gateway/` | Python MCP gateway. stdio MCP server (LLM side) + WebSocket MCP client (ESP32 side) + HTTP capture server. |
-| `docs/` | [`architecture.md`](docs/architecture.md): full component diagram, tool name mapping, photo flow, auth, phase roadmap. [`firmware-sync.md`](docs/firmware-sync.md): upstream xiaozhi-esp32 sync playbook. [`remote-access.md`](docs/remote-access.md): Tailscale Funnel setup for non-LAN use. |
-| `examples/` | Optional, unmaintained examples. [`cloudflare-relay/`](examples/cloudflare-relay/): Cloudflare Workers WebSocket relay for reaching the gateway from outside the local LAN. |
+| `docs/` | [`first-run-from-factory.md`](docs/first-run-from-factory.md): factory kit → flash → Wi-Fi → Cursor. [`architecture.md`](docs/architecture.md): full component diagram, tool name mapping, photo flow, auth, phase roadmap. [`firmware-sync.md`](docs/firmware-sync.md): upstream xiaozhi-esp32 sync playbook. [`remote-access.md`](docs/remote-access.md): Tailscale Funnel setup for non-LAN use. |
+| `examples/` | Optional, unmaintained examples. [`classic-avatar/`](examples/classic-avatar/): load the two-big-eyes face at runtime. [`cloudflare-relay/`](examples/cloudflare-relay/): Cloudflare Workers WebSocket relay for reaching the gateway from outside the local LAN. |
 
 ## Target hardware
 
@@ -77,6 +77,11 @@ This repository is a monorepo.
 See `gateway/README.md` for full schemas.
 
 ## Quick start
+
+If the robot is still on **factory firmware**, follow
+[First run: factory StackChan → Cursor](docs/first-run-from-factory.md)
+([日本語](docs/first-run-from-factory.ja.md)) first — unbind, flash, phone
+Wi-Fi, gateway URL, then Cursor. The steps below are the short form.
 
 ### 1. Flash the firmware (CoreS3)
 
