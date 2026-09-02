@@ -35,9 +35,23 @@ documented-only.
 - Added avatar authoring notes (`docs/avatar-authoring-notes.md`):
   frame-geometry consistency, full-frame exports from layered sources,
   the avatar-set fetch window, and blink cadence tuning.
+- Added `examples/audio-hook-receiver/`: a local HTTP receiver for
+  `STACKCHAN_AUDIO_HOOK_URL` that transcribes tap-to-talk captures and
+  speaks them back through `say`.
   
 ### Gateway
 
+- `STACKCHAN_AUDIO_HOOK_URL=local` transcribes a device-driven
+  (tap / wake-word) capture in-process with faster-whisper and
+  speaks the reply through `say`, so tap-to-talk does not need a
+  second HTTP receiver.
+- `listen()` honours `STACKCHAN_LISTEN_LANGUAGE` when the tool call
+  omits `language` (still `ja` when unset).
+- Reload a configured avatar set on every ESP32 connect via
+  `STACKCHAN_AVATAR_SET_PATH` (optional `STACKCHAN_AVATAR_SET_MODE` /
+  `STACKCHAN_AVATAR_SET_TIMEOUT`). Custom faces live in PSRAM, so this
+  is what brings them back after a robot reboot without a manual
+  `load_avatar_set`.
 - Added an ElevenLabs TTS engine (`STACKCHAN_TTS_ENGINE=elevenlabs`)
   alongside Irodori: official REST API with `eleven_v3` as the default
   model, per-speaker voice ids via `STACKCHAN_ELEVEN_VOICE_<SPEAKER>`

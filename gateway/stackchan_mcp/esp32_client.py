@@ -7,7 +7,7 @@ and as an MCP client that sends commands TO the ESP32.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 import json
 import logging
 import os
@@ -19,7 +19,7 @@ import websockets
 import websockets.exceptions
 from websockets.asyncio.server import ServerConnection
 
-from .audio_input_hook import push_audio_capture
+from .audio_input_hook import handle_local_capture, is_local_hook, push_audio_capture
 from .audio_stream import (
     handle_audio_frame,
     is_recording,
@@ -457,6 +457,9 @@ class ESP32Manager:
         self._lock = asyncio.Lock()
         self._notify_config = notify_config or load_notify_config()
         self._init_tasks: list[asyncio.Task] = []
+        self._on_device_ready: (
+            Callable[[ESP32Connection, str], Awaitable[None]] | None
+        ) = None
         self._vision_url: str = ""
         self._vision_token: str = ""
         # Per-device serialisation for TTS send sequences. Acquired by
@@ -522,6 +525,18 @@ class ESP32Manager:
     def set_notify_config(self, notify_config: NotifyConfig) -> None:
         """Replace the startup notification config used for future events."""
         self._notify_config = notify_config
+
+    def set_on_device_ready(
+        self,
+        callback: Callable[[ESP32Connection, str], Awaitable[None]] | None,
+    ) -> None:
+        """Run ``callback(connection, device_id)`` after a successful init.
+
+        Used by the gateway to reload a configured avatar set on every
+        (re)connect. The callback must fail open: exceptions are logged
+        and do not block the idle-avatar render or ``ESP32 ready``.
+        """
+        self._on_device_ready = callback
 
     @property
     def device_connected(self) -> bool:
@@ -770,19 +785,24 @@ class ESP32Manager:
                                 "session=%s frames=%d",
                                 session_id, len(frames),
                             )
-                            # Push asynchronously so the WebSocket read
-                            # loop is not blocked by the HTTP POST
-                            # round-trip. The task is fire-and-forget;
-                            # failures are logged inside
-                            # push_audio_capture and do not propagate.
-                            asyncio.create_task(
-                                push_audio_capture(
-                                    self._audio_hook_url,
-                                    self._audio_hook_token,
-                                    frames,
-                                    session_id=session_id,
+                            # Fire-and-forget so the WebSocket read
+                            # loop is not blocked by STT or HTTP.
+                            if is_local_hook(self._audio_hook_url):
+                                asyncio.create_task(
+                                    self._handle_local_audio_hook(
+                                        frames,
+                                        session_id,
+                                    )
                                 )
-                            )
+                            else:
+                                asyncio.create_task(
+                                    push_audio_capture(
+                                        self._audio_hook_url,
+                                        self._audio_hook_token,
+                                        frames,
+                                        session_id=session_id,
+                                    )
+                                )
                     else:
                         logger.debug(
                             "listen message with unknown state=%r "
@@ -854,6 +874,20 @@ class ESP32Manager:
                 if self._connection is connection:
                     self._connection = None
 
+    async def _handle_local_audio_hook(
+        self,
+        frames: list[bytes],
+        session_id: str,
+    ) -> None:
+        """Transcribe a tap-to-talk capture and speak in this process."""
+        from .gateway import get_gateway
+
+        await handle_local_capture(
+            frames,
+            session_id=session_id,
+            gateway=get_gateway(),
+        )
+
     async def _init_device(self, connection: ESP32Connection, device_id: str) -> None:
         """Initialize MCP session with a newly connected device."""
         if await connection.initialize(
@@ -864,6 +898,15 @@ class ESP32Manager:
             if not connection.tools_discovered:
                 logger.error("ESP32 tools discovery failed")
                 return
+            if self._on_device_ready is not None:
+                try:
+                    await self._on_device_ready(connection, device_id)
+                except Exception as exc:
+                    logger.warning(
+                        "on_device_ready failed: device=%s error=%s",
+                        device_id,
+                        exc,
+                    )
             await self._auto_render_idle_avatar(connection, device_id)
             logger.info(
                 "ESP32 ready: device=%s tools=%d",

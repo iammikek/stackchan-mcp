@@ -9,16 +9,65 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 from aiohttp import web
 
 from .capture_server import create_capture_app, stage_avatar_set
-from .esp32_client import ESP32Manager
+from .esp32_client import ESP32Connection, ESP32Manager
 from .mdns_advertiser import MdnsAdvertiser
 
 logger = logging.getLogger(__name__)
 
 BEAT_MODE_LISTEN_STOP_TIMEOUT_S = 3.0
+AVATAR_SET_PATH_ENV = "STACKCHAN_AVATAR_SET_PATH"
+AVATAR_SET_MODE_ENV = "STACKCHAN_AVATAR_SET_MODE"
+AVATAR_SET_TIMEOUT_ENV = "STACKCHAN_AVATAR_SET_TIMEOUT"
+_AVATAR_FRAME_BYTES = 160 * 120 * 2
+_AVATAR_LAYERED_BYTES = 14 * _AVATAR_FRAME_BYTES
+_AVATAR_MATRIX_BYTES = 90 * _AVATAR_FRAME_BYTES
+
+
+def resolve_configured_avatar_set() -> dict[str, Any] | None:
+    """Read the optional connect-time avatar-set autoload from the environment.
+
+    ``STACKCHAN_AVATAR_SET_PATH`` is required. Mode defaults from file size
+    (layered = 537,600 bytes, matrix = 3,456,000) or ``matrix`` when the
+    file is missing. Timeout defaults to 180 s for matrix and 60 s for
+    layered; ``STACKCHAN_AVATAR_SET_TIMEOUT`` overrides that.
+    """
+    raw_path = os.getenv(AVATAR_SET_PATH_ENV, "").strip()
+    if not raw_path:
+        return None
+
+    path = os.path.expanduser(raw_path)
+    mode_env = os.getenv(AVATAR_SET_MODE_ENV, "").strip().lower()
+    if mode_env in {"layered", "matrix"}:
+        mode = mode_env
+    elif os.path.isfile(path):
+        size = os.path.getsize(path)
+        if size == _AVATAR_LAYERED_BYTES:
+            mode = "layered"
+        else:
+            mode = "matrix"
+    else:
+        mode = "matrix"
+
+    timeout_raw = os.getenv(AVATAR_SET_TIMEOUT_ENV, "").strip()
+    if timeout_raw:
+        try:
+            timeout = float(timeout_raw)
+        except ValueError:
+            logger.warning(
+                "invalid %s=%r — using mode default",
+                AVATAR_SET_TIMEOUT_ENV,
+                timeout_raw,
+            )
+            timeout = 180.0 if mode == "matrix" else 60.0
+    else:
+        timeout = 180.0 if mode == "matrix" else 60.0
+
+    return {"path": path, "mode": mode, "timeout": timeout}
 
 
 class Gateway:
@@ -86,13 +135,12 @@ class Gateway:
         """URL receiving device-driven listen captures as Ogg/Opus.
 
         STACKCHAN_AUDIO_HOOK_URL enables the device-driven listen
-        capture path (wake word / button / LCD touch): the gateway
-        packs inbound Opus frames into an Ogg container and POSTs to
-        this URL on ``listen.stop``. The capture path is **disabled**
-        when this is unset — stackchan-mcp's primary listen model
-        remains MCP-client-driven (the ``listen()`` tool), and
-        device-driven capture only makes sense when an external
-        service is set up to receive the audio.
+        capture path (wake word / button / LCD touch). ``local``
+        transcribes and speaks in this process on ``listen.stop``.
+        Any other value is an HTTP URL: the gateway packs inbound
+        Opus into Ogg and POSTs it there. The path is **disabled**
+        when unset — stackchan-mcp's primary listen model remains
+        MCP-client-driven (the ``listen()`` tool).
         """
         return os.getenv("STACKCHAN_AUDIO_HOOK_URL", "")
 
@@ -130,6 +178,7 @@ class Gateway:
 
     async def start(self, *, advertise_mdns: bool = True) -> None:
         """Start the ESP32 WebSocket server and HTTP capture server."""
+        self.esp32.set_on_device_ready(self._autoload_configured_avatar_set)
         host = os.getenv("HOST", "0.0.0.0")
         ws_port = int(os.getenv("WS_PORT", os.getenv("PORT", "8765")))
         capture_port = int(os.getenv("CAPTURE_PORT", "8766"))
@@ -289,6 +338,41 @@ class Gateway:
         result.setdefault("checksum", sha256)
         result["bytes_transferred"] = len(payload) if result.get("ok") else 0
         return result
+
+    async def _autoload_configured_avatar_set(
+        self,
+        _connection: ESP32Connection,
+        device_id: str,
+    ) -> None:
+        """Reload STACKCHAN_AVATAR_SET_PATH after every device init.
+
+        Custom sets live in PSRAM and vanish on reboot. This hook runs
+        on connect — including reconnect after the gateway was already
+        up — so the configured face comes back without a manual
+        ``load_avatar_set``. Failures are logged and do not block idle
+        render or the rest of device init.
+        """
+        config = resolve_configured_avatar_set()
+        if config is None:
+            return
+        logger.info(
+            "auto-loading avatar set: device=%s path=%s mode=%s timeout=%.0fs",
+            device_id,
+            config["path"],
+            config["mode"],
+            config["timeout"],
+        )
+        result = await self.load_avatar_set(
+            config["path"],
+            config["mode"],
+            config["timeout"],
+        )
+        if not result.get("ok"):
+            logger.warning(
+                "auto-loading avatar set failed: device=%s error=%s",
+                device_id,
+                result.get("error", result),
+            )
 
 
 # Singleton gateway instance, shared between stdio server and ESP32 manager

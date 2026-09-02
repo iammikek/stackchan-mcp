@@ -158,10 +158,58 @@ export STACKCHAN_EDGE_TTS_DEFAULT_VOICE=en-GB-SoniaNeural
 `say` にテキストを渡します。本文の対応 emoji でも表情は変わりますが、
 `set_avatar` を名前で呼べば emoji は不要です。
 
+## 7b. 任意: 英語の聞き取り
+
+`listen()` はこのマシンで文字起こしします。TTS と一緒に STT extra を入れ、
+言語のデフォルトを英語にして daemon を再起動します:
+
+```bash
+export STACKCHAN_LISTEN_LANGUAGE=en
+# このチェックアウトのゲートウェイ:
+uv run --extra tts --extra stt-faster-whisper --with edge-tts \
+  stackchan-mcp serve --transport streamable-http --no-mdns
+```
+
+初回は Whisper `base` モデル（約 140 MB）をダウンロードします。あとは
+Cursor から「聞いて答えて」と頼めます。一回だけ日本語なら
+`language="ja"` を付けてください。
+
+## 7c. 任意: タップで話す（ローカル audio hook）
+
+画面タップの listen は、hook がないと捨てられます。`local` なら
+**ゲートウェイ自身** が文字起こしして喋ります（`listen()` と同じ Whisper）:
+
+```bash
+export STACKCHAN_AUDIO_HOOK_URL=local
+```
+
+daemon を再起動。顔を短くタップ（赤い LED）→ 話す → もう一度タップ。
+ロボットが `You said: …` と返します。このループに LLM はありません。
+
+Ogg を別プロセスへ POST したい場合は URL をそちらに向けて
+[`examples/audio-hook-receiver/README.md`](../examples/audio-hook-receiver/README.md)
+を見てください。
+
 ## 8. 任意: クラシックなスタックチャン顔
 
 ファームウェアの idle は小さなアイコンです。大きな両目のクラシック顔は
-ランタイムで載せる 90 フレームの matrix です（PSRAM、再起動で消えます）:
+90 フレームの matrix です。PSRAM 上にあるので、ロボット再起動で消えます。
+
+一度ビルドし、ゲートウェイにパスを渡せば **デバイスが繋がるたび**
+（プロセス起動後の再接続も含む）に自動で載ります:
+
+```bash
+uv run --with pillow python examples/classic-avatar/make_classic.py
+export STACKCHAN_AVATAR_SET_PATH="$PWD/examples/classic-avatar/classic-matrix.rgb565"
+```
+
+mode はファイルサイズから推定します（ここでは `matrix`）。
+Wi-Fi 省電力で 3.3 MB の取得が 180 秒に収まらないときは
+`STACKCHAN_AVATAR_SET_TIMEOUT` を上げてください。
+
+この環境変数は今のチェックアウトに入っています。PyPI の公開ゲートウェイは
+次のリリースから対応します。それまではこのツリーから起動するか、
+一回だけ手動で載せてください:
 
 ```bash
 uv run --with pillow python examples/classic-avatar/load_classic.py

@@ -64,6 +64,18 @@ Edit `.env`:
   (something like `192.168.x.y` on a typical home network — run `ifconfig`
   or `ip addr` to find it). Required for `take_photo` when `VISION_URL` is not
   set.
+- `STACKCHAN_AVATAR_SET_PATH`: optional local RGB565 file. Reloaded after
+  every ESP32 hello so a PSRAM custom face comes back after reboot.
+  `STACKCHAN_AVATAR_SET_MODE` (`layered` / `matrix`) is inferred from file
+  size when unset. `STACKCHAN_AVATAR_SET_TIMEOUT` defaults to 180 s for
+  matrix and 60 s for layered.
+- `STACKCHAN_LISTEN_LANGUAGE`: default `listen()` language when the tool
+  call omits `language` (schema default `ja`). `STACKCHAN_FASTER_WHISPER_*`
+  select the local model; install the `[stt-faster-whisper]` extra.
+- `STACKCHAN_AUDIO_HOOK_URL`: when set to `local`, a screen-tap listen
+  is transcribed and spoken in this process. Any other value is an HTTP
+  URL that receives Ogg/Opus; see
+  [`examples/audio-hook-receiver/`](../examples/audio-hook-receiver/).
 
 ## Run
 

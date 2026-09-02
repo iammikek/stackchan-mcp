@@ -26,7 +26,7 @@
 | `firmware/` | [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) フォーク全体（git subtree）。StackChan 用カスタムボードは `firmware/main/boards/stackchan/` に配置 |
 | `gateway/` | Python MCP ゲートウェイ。stdio MCP サーバー (LLM側) + WebSocket MCP クライアント (ESP32側) + HTTP capture サーバー |
 | `docs/` | [`first-run-from-factory.ja.md`](docs/first-run-from-factory.ja.md): 出荷時キット → 書き込み → Wi-Fi → Cursor。[`architecture.md`](docs/architecture.md): 全体構成図・ツール名マッピング・写真フロー・認証・Phase ロードマップ。[`firmware-sync.md`](docs/firmware-sync.md): upstream xiaozhi-esp32 同期手順。[`remote-access.md`](docs/remote-access.md): Tailscale Funnel による非LAN接続手順 |
-| `examples/` | オプションの非保守 example 群。[`classic-avatar/`](examples/classic-avatar/): ランタイムで大きな両目の顔を載せる。[`cloudflare-relay/`](examples/cloudflare-relay/): LAN 外から gateway へ届くための Cloudflare Workers WebSocket リレー |
+| `examples/` | オプションの非保守 example 群。[`classic-avatar/`](examples/classic-avatar/): ランタイムで大きな両目の顔を載せる。[`audio-hook-receiver/`](examples/audio-hook-receiver/): `STACKCHAN_AUDIO_HOOK_URL` 向けのローカル tap-to-talk 受信。[`cloudflare-relay/`](examples/cloudflare-relay/): LAN 外から gateway へ届くための Cloudflare Workers WebSocket リレー |
 
 ## 想定ハードウェア
 
@@ -621,6 +621,7 @@ export OPENAI_API_KEY=sk-...
 
 | 環境変数 | デフォルト | 補足 |
 |---|---|---|
+| `STACKCHAN_LISTEN_LANGUAGE` | `ja` | `listen()` が `language` を省略したときのデフォルト言語 |
 | `STACKCHAN_FASTER_WHISPER_MODEL` | `base` | モデル識別子 — `tiny` / `base` / `small` / `medium` / `large-v3`。大きいモデルほど精度は上がるが、メモリ消費と推論時間も増える |
 | `STACKCHAN_FASTER_WHISPER_DEVICE` | `cpu` | `cpu` / `cuda` / `auto` |
 | `STACKCHAN_FASTER_WHISPER_COMPUTE_TYPE` | `int8` | `int8` / `float16` / `float32` |

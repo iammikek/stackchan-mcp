@@ -26,7 +26,7 @@ This repository is a monorepo.
 | `firmware/` | Full git subtree of [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32). The custom StackChan board lives at `firmware/main/boards/stackchan/`. |
 | `gateway/` | Python MCP gateway. stdio MCP server (LLM side) + WebSocket MCP client (ESP32 side) + HTTP capture server. |
 | `docs/` | [`first-run-from-factory.md`](docs/first-run-from-factory.md): factory kit → flash → Wi-Fi → Cursor. [`architecture.md`](docs/architecture.md): full component diagram, tool name mapping, photo flow, auth, phase roadmap. [`firmware-sync.md`](docs/firmware-sync.md): upstream xiaozhi-esp32 sync playbook. [`remote-access.md`](docs/remote-access.md): Tailscale Funnel setup for non-LAN use. |
-| `examples/` | Optional, unmaintained examples. [`classic-avatar/`](examples/classic-avatar/): load the two-big-eyes face at runtime. [`cloudflare-relay/`](examples/cloudflare-relay/): Cloudflare Workers WebSocket relay for reaching the gateway from outside the local LAN. |
+| `examples/` | Optional, unmaintained examples. [`classic-avatar/`](examples/classic-avatar/): load the two-big-eyes face at runtime. [`audio-hook-receiver/`](examples/audio-hook-receiver/): local tap-to-talk receiver for `STACKCHAN_AUDIO_HOOK_URL`. [`cloudflare-relay/`](examples/cloudflare-relay/): Cloudflare Workers WebSocket relay for reaching the gateway from outside the local LAN. |
 
 ## Target hardware
 
@@ -686,6 +686,7 @@ prerequisite as the `[tts]` extra).
 
 | Environment variable | Default | Notes |
 |---|---|---|
+| `STACKCHAN_LISTEN_LANGUAGE` | `ja` | Default `listen()` language when the tool call omits `language`. |
 | `STACKCHAN_FASTER_WHISPER_MODEL` | `base` | Model identifier — `tiny` / `base` / `small` / `medium` / `large-v3`. Larger models are more accurate but slower and use more memory. |
 | `STACKCHAN_FASTER_WHISPER_DEVICE` | `cpu` | `cpu` / `cuda` / `auto`. |
 | `STACKCHAN_FASTER_WHISPER_COMPUTE_TYPE` | `int8` | `int8` / `float16` / `float32`. |

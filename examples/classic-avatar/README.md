@@ -28,3 +28,18 @@ uv run --with pillow python examples/classic-avatar/load_classic.py
 
 The set lives in PSRAM. A device reboot falls back to the firmware face until
 you load it again.
+
+## Autoload on every connect
+
+Point the gateway at the built file so it reloads after hello — including
+reconnects while the gateway is already running:
+
+```bash
+export STACKCHAN_AVATAR_SET_PATH="$PWD/examples/classic-avatar/classic-matrix.rgb565"
+```
+
+Optional: `STACKCHAN_AVATAR_SET_MODE=matrix` (inferred from size) and
+`STACKCHAN_AVATAR_SET_TIMEOUT=180`. Export these in the same environment
+that starts `stackchan-mcp serve` (the uv-installed CLI does not reliably
+pick up a cwd `.env`). This hook is in the current checkout; published
+PyPI builds pick it up on the next gateway release.

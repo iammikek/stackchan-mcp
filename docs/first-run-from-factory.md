@@ -169,10 +169,59 @@ export STACKCHAN_EDGE_TTS_DEFAULT_VOICE=en-GB-SoniaNeural
 Then `say` with text. A supported emoji in the text can still change
 the face; you can also call `set_avatar` by name and skip emoji.
 
+## 7b. Optional: English listening
+
+`listen()` transcribes on this computer. Install the STT extra next to
+TTS, default the language to English, and restart the daemon:
+
+```bash
+export STACKCHAN_LISTEN_LANGUAGE=en
+# checkout gateway:
+uv run --extra tts --extra stt-faster-whisper --with edge-tts \
+  stackchan-mcp serve --transport streamable-http --no-mdns
+```
+
+The first call downloads the Whisper `base` model (~140 MB). Then from
+Cursor: ask the agent to listen and reply. Pass `language="ja"` on a
+call if you want Japanese for one utterance.
+
+## 7c. Optional: tap-to-talk (local audio hook)
+
+Screen-tap listen is discarded unless the gateway has a hook. The
+value `local` transcribes and speaks **in the gateway process** (same
+Whisper extra as `listen()`):
+
+```bash
+export STACKCHAN_AUDIO_HOOK_URL=local
+```
+
+Restart the daemon. Short-tap the face (red LED), speak, tap again.
+The robot says `You said: …`. There is no LLM in this loop.
+
+To POST the Ogg capture to another program instead, set the URL to
+that program and see
+[`examples/audio-hook-receiver/README.md`](../examples/audio-hook-receiver/README.md).
+
 ## 8. Optional: classic Stack-chan face
 
 The firmware idle face is a small icon. The classic two-big-eyes look
-is a 90-frame matrix you load at runtime (PSRAM, gone on reboot):
+is a 90-frame matrix. It lives in PSRAM, so a robot reboot drops it.
+
+Build once, then point the gateway at the file so **every device
+connect** reloads it (gateway start and later reconnects):
+
+```bash
+uv run --with pillow python examples/classic-avatar/make_classic.py
+export STACKCHAN_AVATAR_SET_PATH="$PWD/examples/classic-avatar/classic-matrix.rgb565"
+```
+
+Mode is inferred from file size (`matrix` here). Raise
+`STACKCHAN_AVATAR_SET_TIMEOUT` if Wi-Fi power save makes the 3.3 MB
+fetch miss the default 180 s.
+
+This env var is in the current checkout. The published PyPI gateway
+gains it on the next release; until then run the gateway from this
+tree, or load once with:
 
 ```bash
 uv run --with pillow python examples/classic-avatar/load_classic.py
