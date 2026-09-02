@@ -32,7 +32,8 @@ you load it again.
 ## Autoload on every connect
 
 Point the gateway at the built file so it reloads after hello — including
-reconnects while the gateway is already running:
+reconnects while the gateway is already running. The same hook turns
+blink back on (firmware starts with blink off):
 
 ```bash
 export STACKCHAN_AVATAR_SET_PATH="$PWD/examples/classic-avatar/classic-matrix.rgb565"

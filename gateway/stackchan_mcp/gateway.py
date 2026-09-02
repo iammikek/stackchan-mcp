@@ -350,29 +350,53 @@ class Gateway:
         on connect — including reconnect after the gateway was already
         up — so the configured face comes back without a manual
         ``load_avatar_set``. Failures are logged and do not block idle
-        render or the rest of device init.
+        render or the rest of device init. Blink is re-enabled after
+        the load attempt (firmware starts with blink off).
         """
         config = resolve_configured_avatar_set()
-        if config is None:
-            return
-        logger.info(
-            "auto-loading avatar set: device=%s path=%s mode=%s timeout=%.0fs",
-            device_id,
-            config["path"],
-            config["mode"],
-            config["timeout"],
-        )
-        result = await self.load_avatar_set(
-            config["path"],
-            config["mode"],
-            config["timeout"],
-        )
-        if not result.get("ok"):
-            logger.warning(
-                "auto-loading avatar set failed: device=%s error=%s",
+        if config is not None:
+            logger.info(
+                "auto-loading avatar set: device=%s path=%s mode=%s timeout=%.0fs",
                 device_id,
-                result.get("error", result),
+                config["path"],
+                config["mode"],
+                config["timeout"],
             )
+            result = await self.load_avatar_set(
+                config["path"],
+                config["mode"],
+                config["timeout"],
+            )
+            if not result.get("ok"):
+                logger.warning(
+                    "auto-loading avatar set failed: device=%s error=%s",
+                    device_id,
+                    result.get("error", result),
+                )
+        await self._enable_connect_blink(device_id)
+
+    async def _enable_connect_blink(self, device_id: str) -> None:
+        """Turn autonomous blink back on after a fresh device session."""
+        try:
+            _result, error = await self.esp32.call_tool(
+                "self.display.set_blink",
+                {"enabled": True},
+            )
+        except Exception as exc:
+            logger.warning(
+                "auto-enabling blink failed: device=%s error=%s",
+                device_id,
+                exc,
+            )
+            return
+        if error:
+            logger.warning(
+                "auto-enabling blink failed: device=%s error=%s",
+                device_id,
+                error,
+            )
+            return
+        logger.info("auto-enabled blink: device=%s", device_id)
 
 
 # Singleton gateway instance, shared between stdio server and ESP32 manager

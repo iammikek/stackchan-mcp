@@ -68,7 +68,8 @@ Edit `.env`:
   every ESP32 hello so a PSRAM custom face comes back after reboot.
   `STACKCHAN_AVATAR_SET_MODE` (`layered` / `matrix`) is inferred from file
   size when unset. `STACKCHAN_AVATAR_SET_TIMEOUT` defaults to 180 s for
-  matrix and 60 s for layered.
+  matrix and 60 s for layered. The same connect hook re-enables
+  autonomous blink (firmware starts with blink off).
 - `STACKCHAN_LISTEN_LANGUAGE`: default `listen()` language when the tool
   call omits `language` (schema default `ja`). `STACKCHAN_FASTER_WHISPER_*`
   select the local model; install the `[stt-faster-whisper]` extra.

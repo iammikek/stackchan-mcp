@@ -208,7 +208,8 @@ The firmware idle face is a small icon. The classic two-big-eyes look
 is a 90-frame matrix. It lives in PSRAM, so a robot reboot drops it.
 
 Build once, then point the gateway at the file so **every device
-connect** reloads it (gateway start and later reconnects):
+connect** reloads it (gateway start and later reconnects). The same
+hook turns blink back on — firmware starts with blink off.
 
 ```bash
 uv run --with pillow python examples/classic-avatar/make_classic.py

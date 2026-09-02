@@ -196,7 +196,8 @@ Ogg を別プロセスへ POST したい場合は URL をそちらに向けて
 90 フレームの matrix です。PSRAM 上にあるので、ロボット再起動で消えます。
 
 一度ビルドし、ゲートウェイにパスを渡せば **デバイスが繋がるたび**
-（プロセス起動後の再接続も含む）に自動で載ります:
+（プロセス起動後の再接続も含む）に自動で載ります。同じフックで
+瞬き（blink）も戻します。ファームウェア起動時は blink がオフです:
 
 ```bash
 uv run --with pillow python examples/classic-avatar/make_classic.py

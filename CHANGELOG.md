@@ -51,7 +51,8 @@ documented-only.
   `STACKCHAN_AVATAR_SET_PATH` (optional `STACKCHAN_AVATAR_SET_MODE` /
   `STACKCHAN_AVATAR_SET_TIMEOUT`). Custom faces live in PSRAM, so this
   is what brings them back after a robot reboot without a manual
-  `load_avatar_set`.
+  `load_avatar_set`. The same hook re-enables autonomous blink
+  (firmware starts with blink off).
 - Added an ElevenLabs TTS engine (`STACKCHAN_TTS_ENGINE=elevenlabs`)
   alongside Irodori: official REST API with `eleven_v3` as the default
   model, per-speaker voice ids via `STACKCHAN_ELEVEN_VOICE_<SPEAKER>`

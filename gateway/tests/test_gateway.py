@@ -473,12 +473,22 @@ def test_resolve_configured_avatar_set_honours_overrides(monkeypatch, tmp_path):
     }
 
 
+class _BlinkEsp32:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict]] = []
+
+    async def call_tool(self, name: str, arguments: dict):
+        self.calls.append((name, arguments))
+        return {"ok": True}, None
+
+
 @pytest.mark.asyncio
 async def test_autoload_configured_avatar_set_skips_when_unset(monkeypatch):
     from stackchan_mcp.gateway import Gateway
 
     monkeypatch.delenv("STACKCHAN_AVATAR_SET_PATH", raising=False)
     gw = Gateway()
+    gw.esp32 = _BlinkEsp32()  # type: ignore[assignment]
     called = False
 
     async def boom(*_args, **_kwargs):
@@ -489,6 +499,7 @@ async def test_autoload_configured_avatar_set_skips_when_unset(monkeypatch):
     gw.load_avatar_set = boom  # type: ignore[method-assign]
     await gw._autoload_configured_avatar_set(None, "device-test")  # type: ignore[arg-type]
     assert called is False
+    assert gw.esp32.calls == [("self.display.set_blink", {"enabled": True})]
 
 
 @pytest.mark.asyncio
@@ -504,6 +515,7 @@ async def test_autoload_configured_avatar_set_loads_and_logs_failure(
     monkeypatch.setenv("STACKCHAN_AVATAR_SET_TIMEOUT", "120")
 
     gw = Gateway()
+    gw.esp32 = _BlinkEsp32()  # type: ignore[assignment]
     calls: list[tuple] = []
 
     async def fake_load(path: str, mode: str, timeout: float = 60.0):
@@ -517,3 +529,22 @@ async def test_autoload_configured_avatar_set_loads_and_logs_failure(
     assert calls == [(str(archive), "matrix", 120.0)]
     assert "auto-loading avatar set failed" in caplog.text
     assert "device_timeout" in caplog.text
+    assert gw.esp32.calls == [("self.display.set_blink", {"enabled": True})]
+
+
+@pytest.mark.asyncio
+async def test_autoload_blink_failure_does_not_raise(monkeypatch, caplog):
+    from stackchan_mcp.gateway import Gateway
+
+    monkeypatch.delenv("STACKCHAN_AVATAR_SET_PATH", raising=False)
+    gw = Gateway()
+
+    class BoomEsp32:
+        async def call_tool(self, _name: str, _arguments: dict):
+            raise RuntimeError("no device")
+
+    gw.esp32 = BoomEsp32()  # type: ignore[assignment]
+    caplog.set_level("WARNING")
+    await gw._autoload_configured_avatar_set(None, "device-test")  # type: ignore[arg-type]
+    assert "auto-enabling blink failed" in caplog.text
+    assert "no device" in caplog.text

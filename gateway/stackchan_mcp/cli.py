@@ -57,6 +57,7 @@ Environment variables:
   STACKCHAN_AVATAR_SET_PATH
                            Local RGB565 file reloaded on every ESP32
                            connect (custom faces live in PSRAM).
+                           The same hook re-enables blink.
   STACKCHAN_AVATAR_SET_MODE
                            layered or matrix. Inferred from file size
                            when unset.
