@@ -35,7 +35,7 @@ documented-only.
 - Added avatar authoring notes (`docs/avatar-authoring-notes.md`):
   frame-geometry consistency, full-frame exports from layered sources,
   the avatar-set fetch window, and blink cadence tuning.
-  
+
 ### Gateway
 
 - Added an ElevenLabs TTS engine (`STACKCHAN_TTS_ENGINE=elevenlabs`)
@@ -53,9 +53,18 @@ documented-only.
   connection flags. The id changes on every (re)connection, so a polling
   host can detect a device reboot even when the reconnect lands between
   polls and `connected` never reads false.
+- Dispatch `set_off_timeout` / `get_off_timeout` MCP calls through to the
+  device's `self.screen.set_off_timeout` / `self.screen.get_off_timeout`
+  tools, so the new firmware screen-off timeout is reachable over the
+  gateway.
 
 ### Firmware
 
+- Added a persistent StackChan screen-off timeout (300 seconds by default,
+  `0` to disable) with touch, voice-session (including gateway `say`), avatar,
+  emotion, and MCP wake paths. Activity resets both screen-off and system
+  power-save deadlines. Includes `self.screen.set_off_timeout` /
+  `self.screen.get_off_timeout` controls.
 - Added opt-in, compile-time configurable AXP2101 charge hysteresis for StackChan. The feature is disabled by default; when enabled, startup first allows charging, protection disables it at 70% or above, and charging resumes at 30% or below. An unreadable fuel gauge fails safe to charging enabled. `self.power.set_charge_enabled` and `self.power.get_charge_state` provide manual control and state inspection.
 
 ## [0.17.0] - 2026-07-12
