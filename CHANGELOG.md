@@ -60,6 +60,12 @@ documented-only.
 
 ### Firmware
 
+- Added an active firmware-side WebSocket keepalive that detects silent
+  network breaks and triggers the existing reconnect path. A periodic
+  Ping (every 15 s) probes the connection; the Pong response refreshes
+  a liveness timestamp via `WebSocket::OnPong` (esp-ml307 #49). If no
+  frame arrives within 60 s, the connection is considered dead and a
+  graceful reconnect is forced without a device reboot. (#239)
 - Added a persistent StackChan screen-off timeout (300 seconds by default,
   `0` to disable) with touch, voice-session (including gateway `say`), avatar,
   emotion, and MCP wake paths. Activity resets both screen-off and system
