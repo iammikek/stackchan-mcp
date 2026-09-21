@@ -39,6 +39,7 @@ documented-only.
   `STACKCHAN_AUDIO_HOOK_URL` that transcribes tap-to-talk captures and
   speaks them back through `say`. Language defaults to `ja` (same as
   gateway `listen()`), overridable via `STACKCHAN_LISTEN_LANGUAGE`.
+  English and Japanese READMEs are kept in sync.
 
 ### Gateway
 

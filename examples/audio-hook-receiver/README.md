@@ -1,5 +1,7 @@
 # Audio hook receiver
 
+[日本語](README.ja.md)
+
 Optional HTTP receiver for **device-driven** listen when you want the
 Ogg/Opus POST to leave the gateway. For a single-machine desk setup,
 prefer `STACKCHAN_AUDIO_HOOK_URL=local` instead — the gateway
