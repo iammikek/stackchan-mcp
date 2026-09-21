@@ -473,6 +473,36 @@ def test_resolve_configured_avatar_set_honours_overrides(monkeypatch, tmp_path):
     }
 
 
+def test_resolve_configured_avatar_set_fails_closed_on_unknown_size(
+    monkeypatch, tmp_path, caplog
+):
+    from stackchan_mcp.gateway import resolve_configured_avatar_set
+
+    weird = tmp_path / "weird.rgb565"
+    weird.write_bytes(b"x" * 1234)
+    monkeypatch.setenv("STACKCHAN_AVATAR_SET_PATH", str(weird))
+    monkeypatch.delenv("STACKCHAN_AVATAR_SET_MODE", raising=False)
+    monkeypatch.delenv("STACKCHAN_AVATAR_SET_TIMEOUT", raising=False)
+
+    caplog.set_level("WARNING")
+    assert resolve_configured_avatar_set() is None
+    assert "neither layered" in caplog.text
+
+
+def test_resolve_configured_avatar_set_fails_closed_when_missing_without_mode(
+    monkeypatch, tmp_path, caplog
+):
+    from stackchan_mcp.gateway import resolve_configured_avatar_set
+
+    missing = tmp_path / "missing.rgb565"
+    monkeypatch.setenv("STACKCHAN_AVATAR_SET_PATH", str(missing))
+    monkeypatch.delenv("STACKCHAN_AVATAR_SET_MODE", raising=False)
+
+    caplog.set_level("WARNING")
+    assert resolve_configured_avatar_set() is None
+    assert "file is missing" in caplog.text
+
+
 class _BlinkEsp32:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict]] = []
@@ -499,7 +529,7 @@ async def test_autoload_configured_avatar_set_skips_when_unset(monkeypatch):
     gw.load_avatar_set = boom  # type: ignore[method-assign]
     await gw._autoload_configured_avatar_set(None, "device-test")  # type: ignore[arg-type]
     assert called is False
-    assert gw.esp32.calls == [("self.display.set_blink", {"enabled": True})]
+    assert gw.esp32.calls == []
 
 
 @pytest.mark.asyncio
@@ -533,16 +563,23 @@ async def test_autoload_configured_avatar_set_loads_and_logs_failure(
 
 
 @pytest.mark.asyncio
-async def test_autoload_blink_failure_does_not_raise(monkeypatch, caplog):
+async def test_autoload_blink_failure_does_not_raise(monkeypatch, tmp_path, caplog):
     from stackchan_mcp.gateway import Gateway
 
-    monkeypatch.delenv("STACKCHAN_AVATAR_SET_PATH", raising=False)
+    archive = tmp_path / "classic.rgb565"
+    archive.write_bytes(b"x")
+    monkeypatch.setenv("STACKCHAN_AVATAR_SET_PATH", str(archive))
+    monkeypatch.setenv("STACKCHAN_AVATAR_SET_MODE", "matrix")
     gw = Gateway()
+
+    async def fake_load(*_args, **_kwargs):
+        return {"ok": True}
 
     class BoomEsp32:
         async def call_tool(self, _name: str, _arguments: dict):
             raise RuntimeError("no device")
 
+    gw.load_avatar_set = fake_load  # type: ignore[method-assign]
     gw.esp32 = BoomEsp32()  # type: ignore[assignment]
     caplog.set_level("WARNING")
     await gw._autoload_configured_avatar_set(None, "device-test")  # type: ignore[arg-type]

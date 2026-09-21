@@ -47,26 +47,25 @@ Environment variables:
   VISION_HOST              LAN IP of this machine, as seen from the ESP32.
   VISION_TOKEN             Optional separate token for VISION_URL uploads.
   STACKCHAN_AUDIO_HOOK_URL Enables device-driven listen capture.
-                           Use "local" to transcribe and speak in this
-                           process. Any other value is an HTTP URL that
-                           receives Ogg/Opus on listen.stop. Leave
-                           unset to keep MCP-driven listen() only.
+                           HTTP URL that receives Ogg/Opus on
+                           listen.stop. Leave unset to keep
+                           MCP-driven listen() only.
   STACKCHAN_AUDIO_HOOK_TOKEN
                            Bearer token for the audio hook endpoint;
                            falls back to STACKCHAN_TOKEN.
   STACKCHAN_AVATAR_SET_PATH
                            Local RGB565 file reloaded on every ESP32
                            connect (custom faces live in PSRAM).
-                           The same hook re-enables blink.
+                           When set, the same hook re-enables blink.
   STACKCHAN_AVATAR_SET_MODE
-                           layered or matrix. Inferred from file size
-                           when unset.
+                           layered or matrix. Required unless the file
+                           size matches layered or matrix exactly.
   STACKCHAN_AVATAR_SET_TIMEOUT
                            Seconds to wait for the device fetch
                            (default 180 matrix / 60 layered).
   STACKCHAN_LISTEN_LANGUAGE
-                           Default listen() / local-hook language when
-                           the call omits language (default ja).
+                           Default listen() language when the call
+                           omits language (default ja).
   HOST                     Bind address for the ESP32 WebSocket server
                            (default 0.0.0.0).
   WS_PORT                  Port for the ESP32 WebSocket server

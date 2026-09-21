@@ -171,24 +171,9 @@ uv run --extra tts --extra stt-faster-whisper --with edge-tts \
 ```
 
 初回は Whisper `base` モデル（約 140 MB）をダウンロードします。あとは
-Cursor から「聞いて答えて」と頼めます。一回だけ日本語なら
-`language="ja"` を付けてください。
-
-## 7c. 任意: タップで話す（ローカル audio hook）
-
-画面タップの listen は、hook がないと捨てられます。`local` なら
-**ゲートウェイ自身** が文字起こしして喋ります（`listen()` と同じ Whisper）:
-
-```bash
-export STACKCHAN_AUDIO_HOOK_URL=local
-```
-
-daemon を再起動。顔を短くタップ（赤い LED）→ 話す → もう一度タップ。
-ロボットが `You said: …` と返します。このループに LLM はありません。
-
-Ogg を別プロセスへ POST したい場合は URL をそちらに向けて
-[`examples/audio-hook-receiver/README.md`](../examples/audio-hook-receiver/README.md)
-を見てください。
+Cursor から「聞いて答えて」と頼めます。`language` には **スキーマ default
+がありません** — 省略すると `STACKCHAN_LISTEN_LANGUAGE` が使われます。
+一回だけ日本語なら `language="ja"` を付けてください。
 
 ## 8. 任意: クラシックなスタックチャン顔
 
@@ -196,17 +181,20 @@ Ogg を別プロセスへ POST したい場合は URL をそちらに向けて
 90 フレームの matrix です。PSRAM 上にあるので、ロボット再起動で消えます。
 
 一度ビルドし、ゲートウェイにパスを渡せば **デバイスが繋がるたび**
-（プロセス起動後の再接続も含む）に自動で載ります。同じフックで
-瞬き（blink）も戻します。ファームウェア起動時は blink がオフです:
+（プロセス起動後の再接続も含む）に自動で載ります。このパスが設定されている
+ときだけ、同じフックで瞬き（blink）も戻します。ファームウェア起動時は
+blink がオフです:
 
 ```bash
 uv run --with pillow python examples/classic-avatar/make_classic.py
 export STACKCHAN_AVATAR_SET_PATH="$PWD/examples/classic-avatar/classic-matrix.rgb565"
 ```
 
-mode はファイルサイズから推定します（ここでは `matrix`）。
+mode は厳密なファイルサイズから推定します（ここでは `matrix`）。
 Wi-Fi 省電力で 3.3 MB の取得が 180 秒に収まらないときは
-`STACKCHAN_AVATAR_SET_TIMEOUT` を上げてください。
+`STACKCHAN_AVATAR_SET_TIMEOUT` を上げてください。サイズが layered /
+matrix のいずれでもない場合は `STACKCHAN_AVATAR_SET_MODE` を明示してください
+（ゲートウェイは推測しません）。
 
 この環境変数は今のチェックアウトに入っています。PyPI の公開ゲートウェイは
 次のリリースから対応します。それまではこのツリーから起動するか、

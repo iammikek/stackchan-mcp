@@ -31,9 +31,10 @@ _AVATAR_MATRIX_BYTES = 90 * _AVATAR_FRAME_BYTES
 def resolve_configured_avatar_set() -> dict[str, Any] | None:
     """Read the optional connect-time avatar-set autoload from the environment.
 
-    ``STACKCHAN_AVATAR_SET_PATH`` is required. Mode defaults from file size
-    (layered = 537,600 bytes, matrix = 3,456,000) or ``matrix`` when the
-    file is missing. Timeout defaults to 180 s for matrix and 60 s for
+    ``STACKCHAN_AVATAR_SET_PATH`` is required. Mode comes from
+    ``STACKCHAN_AVATAR_SET_MODE`` when set, otherwise from an exact file
+    size match (layered = 537,600 bytes, matrix = 3,456,000). Unknown
+    sizes fail closed. Timeout defaults to 180 s for matrix and 60 s for
     layered; ``STACKCHAN_AVATAR_SET_TIMEOUT`` overrides that.
     """
     raw_path = os.getenv(AVATAR_SET_PATH_ENV, "").strip()
@@ -44,14 +45,33 @@ def resolve_configured_avatar_set() -> dict[str, Any] | None:
     mode_env = os.getenv(AVATAR_SET_MODE_ENV, "").strip().lower()
     if mode_env in {"layered", "matrix"}:
         mode = mode_env
-    elif os.path.isfile(path):
+    elif not os.path.isfile(path):
+        logger.warning(
+            "%s=%r is set but the file is missing and %s is unset — "
+            "skipping avatar-set autoload",
+            AVATAR_SET_PATH_ENV,
+            path,
+            AVATAR_SET_MODE_ENV,
+        )
+        return None
+    else:
         size = os.path.getsize(path)
         if size == _AVATAR_LAYERED_BYTES:
             mode = "layered"
-        else:
+        elif size == _AVATAR_MATRIX_BYTES:
             mode = "matrix"
-    else:
-        mode = "matrix"
+        else:
+            logger.warning(
+                "%s=%r size=%d is neither layered (%d) nor matrix (%d) "
+                "and %s is unset — skipping avatar-set autoload",
+                AVATAR_SET_PATH_ENV,
+                path,
+                size,
+                _AVATAR_LAYERED_BYTES,
+                _AVATAR_MATRIX_BYTES,
+                AVATAR_SET_MODE_ENV,
+            )
+            return None
 
     timeout_raw = os.getenv(AVATAR_SET_TIMEOUT_ENV, "").strip()
     if timeout_raw:
@@ -350,33 +370,35 @@ class Gateway:
         on connect — including reconnect after the gateway was already
         up — so the configured face comes back without a manual
         ``load_avatar_set``. Failures are logged and do not block idle
-        render or the rest of device init. Blink is re-enabled after
-        the load attempt (firmware starts with blink off).
+        render or the rest of device init. When an avatar set is
+        configured, blink is also re-enabled after the load attempt
+        (firmware starts with blink off).
         """
         config = resolve_configured_avatar_set()
-        if config is not None:
-            logger.info(
-                "auto-loading avatar set: device=%s path=%s mode=%s timeout=%.0fs",
+        if config is None:
+            return
+        logger.info(
+            "auto-loading avatar set: device=%s path=%s mode=%s timeout=%.0fs",
+            device_id,
+            config["path"],
+            config["mode"],
+            config["timeout"],
+        )
+        result = await self.load_avatar_set(
+            config["path"],
+            config["mode"],
+            config["timeout"],
+        )
+        if not result.get("ok"):
+            logger.warning(
+                "auto-loading avatar set failed: device=%s error=%s",
                 device_id,
-                config["path"],
-                config["mode"],
-                config["timeout"],
+                result.get("error", result),
             )
-            result = await self.load_avatar_set(
-                config["path"],
-                config["mode"],
-                config["timeout"],
-            )
-            if not result.get("ok"):
-                logger.warning(
-                    "auto-loading avatar set failed: device=%s error=%s",
-                    device_id,
-                    result.get("error", result),
-                )
         await self._enable_connect_blink(device_id)
 
     async def _enable_connect_blink(self, device_id: str) -> None:
-        """Turn autonomous blink back on after a fresh device session."""
+        """Turn autonomous blink on after a configured avatar-set autoload."""
         try:
             _result, error = await self.esp32.call_tool(
                 "self.display.set_blink",

@@ -182,25 +182,9 @@ uv run --extra tts --extra stt-faster-whisper --with edge-tts \
 ```
 
 The first call downloads the Whisper `base` model (~140 MB). Then from
-Cursor: ask the agent to listen and reply. Pass `language="ja"` on a
-call if you want Japanese for one utterance.
-
-## 7c. Optional: tap-to-talk (local audio hook)
-
-Screen-tap listen is discarded unless the gateway has a hook. The
-value `local` transcribes and speaks **in the gateway process** (same
-Whisper extra as `listen()`):
-
-```bash
-export STACKCHAN_AUDIO_HOOK_URL=local
-```
-
-Restart the daemon. Short-tap the face (red LED), speak, tap again.
-The robot says `You said: …`. There is no LLM in this loop.
-
-To POST the Ogg capture to another program instead, set the URL to
-that program and see
-[`examples/audio-hook-receiver/README.md`](../examples/audio-hook-receiver/README.md).
+Cursor: ask the agent to listen and reply. The tool has **no schema
+default** for `language` — omit it so `STACKCHAN_LISTEN_LANGUAGE`
+applies, or pass `language="ja"` for one Japanese utterance.
 
 ## 8. Optional: classic Stack-chan face
 
@@ -208,17 +192,19 @@ The firmware idle face is a small icon. The classic two-big-eyes look
 is a 90-frame matrix. It lives in PSRAM, so a robot reboot drops it.
 
 Build once, then point the gateway at the file so **every device
-connect** reloads it (gateway start and later reconnects). The same
-hook turns blink back on — firmware starts with blink off.
+connect** reloads it (gateway start and later reconnects). When this
+path is set, the same hook also turns blink back on (firmware starts
+with blink off):
 
 ```bash
 uv run --with pillow python examples/classic-avatar/make_classic.py
 export STACKCHAN_AVATAR_SET_PATH="$PWD/examples/classic-avatar/classic-matrix.rgb565"
 ```
 
-Mode is inferred from file size (`matrix` here). Raise
+Mode is inferred from exact file size (`matrix` here). Raise
 `STACKCHAN_AVATAR_SET_TIMEOUT` if Wi-Fi power save makes the 3.3 MB
-fetch miss the default 180 s.
+fetch miss the default 180 s. If the size is not layered or matrix,
+set `STACKCHAN_AVATAR_SET_MODE` explicitly — the gateway will not guess.
 
 This env var is in the current checkout. The published PyPI gateway
 gains it on the next release; until then run the gateway from this
