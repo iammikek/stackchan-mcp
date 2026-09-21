@@ -39,7 +39,7 @@ documented-only.
 - Added avatar authoring notes (`docs/avatar-authoring-notes.md`):
   frame-geometry consistency, full-frame exports from layered sources,
   the avatar-set fetch window, and blink cadence tuning.
-  
+
 ### Gateway
 
 - `listen()` honours `STACKCHAN_LISTEN_LANGUAGE` when the tool call
@@ -71,9 +71,24 @@ documented-only.
   connection flags. The id changes on every (re)connection, so a polling
   host can detect a device reboot even when the reconnect lands between
   polls and `connected` never reads false.
+- Dispatch `set_off_timeout` / `get_off_timeout` MCP calls through to the
+  device's `self.screen.set_off_timeout` / `self.screen.get_off_timeout`
+  tools, so the new firmware screen-off timeout is reachable over the
+  gateway.
 
 ### Firmware
 
+- Added an active firmware-side WebSocket keepalive that detects silent
+  network breaks and triggers the existing reconnect path. A periodic
+  Ping (every 15 s) probes the connection; the Pong response refreshes
+  a liveness timestamp via `WebSocket::OnPong` (esp-ml307 #49). If no
+  frame arrives within 60 s, the connection is considered dead and a
+  graceful reconnect is forced without a device reboot. (#239)
+- Added a persistent StackChan screen-off timeout (300 seconds by default,
+  `0` to disable) with touch, voice-session (including gateway `say`), avatar,
+  emotion, and MCP wake paths. Activity resets both screen-off and system
+  power-save deadlines. Includes `self.screen.set_off_timeout` /
+  `self.screen.get_off_timeout` controls.
 - Added opt-in, compile-time configurable AXP2101 charge hysteresis for StackChan. The feature is disabled by default; when enabled, startup first allows charging, protection disables it at 70% or above, and charging resumes at 30% or below. An unreadable fuel gauge fails safe to charging enabled. `self.power.set_charge_enabled` and `self.power.get_charge_state` provide manual control and state inspection.
 
 ## [0.17.0] - 2026-07-12
