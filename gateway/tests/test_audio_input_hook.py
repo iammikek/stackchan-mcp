@@ -12,12 +12,46 @@ from stackchan_mcp.audio_input_hook import (
     GRANULE_PER_FRAME,
     _build_opus_head_packet,
     _ogg_crc32,
+    is_local_hook,
+    local_listen_language,
+    local_reply_text,
     pack_opus_frames_to_ogg,
     push_audio_capture,
 )
 
 
 # --- Ogg CRC32 sanity --------------------------------------------------------
+
+
+def test_is_local_hook():
+    assert is_local_hook("local") is True
+    assert is_local_hook("LOCAL") is True
+    assert is_local_hook(" http://127.0.0.1:8780/audio") is False
+    assert is_local_hook("") is False
+
+
+def test_local_reply_text():
+    assert local_reply_text("") == "I did not catch that."
+    assert local_reply_text("  hello ") == "You said: hello"
+
+
+def test_local_listen_language_matches_listen_default(monkeypatch):
+    """Omitted listen() language and the local hook share one default."""
+    monkeypatch.delenv("STACKCHAN_LISTEN_LANGUAGE", raising=False)
+    assert local_listen_language() == "ja"
+    monkeypatch.setenv("STACKCHAN_LISTEN_LANGUAGE", "en")
+    assert local_listen_language() == "en"
+
+
+def test_local_listen_language_uses_shared_resolver(monkeypatch):
+    import stackchan_mcp.stt.orchestrator as orchestrator
+
+    def resolver(arguments):
+        assert arguments == {}
+        return "en"
+
+    monkeypatch.setattr(orchestrator, "resolve_listen_language", resolver, raising=False)
+    assert local_listen_language() == "en"
 
 
 def test_ogg_crc32_empty():

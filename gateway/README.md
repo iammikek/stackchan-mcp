@@ -68,6 +68,13 @@ Edit `.env`:
   call omits `language` (falls back to `ja`). The MCP schema does not
   advertise a language default. `STACKCHAN_FASTER_WHISPER_*` select the
   local model; install the `[stt-faster-whisper]` extra.
+- `STACKCHAN_AUDIO_HOOK_URL`: when set to `local`, a screen-tap listen
+  is transcribed and spoken in this process, on the device that
+  captured it. Any other value is an HTTP URL that receives Ogg/Opus;
+  see [`examples/audio-hook-receiver/`](../examples/audio-hook-receiver/).
+  The local path calls `resolve_listen_language` with no argument, so
+  it uses `STACKCHAN_LISTEN_LANGUAGE` or `ja`, the same default as
+  `listen()` when `language` is omitted.
 
 ## Run
 

@@ -30,6 +30,25 @@ documented-only.
 
 ## [Unreleased]
 
+### Docs
+
+- Added `examples/audio-hook-receiver/`: a local HTTP receiver for
+  `STACKCHAN_AUDIO_HOOK_URL` that transcribes tap-to-talk captures and
+  speaks them back through `say`. Language defaults to `ja` (same as
+  gateway `listen()`), overridable via `STACKCHAN_LISTEN_LANGUAGE`.
+  English and Japanese READMEs are kept in sync.
+
+### Gateway
+
+- `STACKCHAN_AUDIO_HOOK_URL=local` transcribes a device-driven
+  (tap / wake-word) capture in-process with faster-whisper and
+  speaks the reply through `say` on that device, so tap-to-talk does
+  not need a second HTTP receiver. Overlapping tap replies are
+  serialized so they cannot talk over each other. Language is
+  `resolve_listen_language` with no argument: `STACKCHAN_LISTEN_LANGUAGE`,
+  otherwise `ja`, the same default as `listen()` when `language` is
+  omitted.
+
 ## [0.19.0] - 2026-10-22
 
 ### Gateway
