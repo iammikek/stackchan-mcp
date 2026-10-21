@@ -26,7 +26,7 @@ This repository is a monorepo.
 | `firmware/` | Full git subtree of [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32). The custom StackChan board lives at `firmware/main/boards/stackchan/`. |
 | `gateway/` | Python MCP gateway. stdio MCP server (LLM side) + WebSocket MCP client (ESP32 side) + HTTP capture server. |
 | `docs/` | [`first-run-from-factory.md`](docs/first-run-from-factory.md): factory kit → flash → Wi-Fi → Cursor. [`architecture.md`](docs/architecture.md): full component diagram, tool name mapping, photo flow, auth, phase roadmap. [`firmware-sync.md`](docs/firmware-sync.md): upstream xiaozhi-esp32 sync playbook. [`remote-access.md`](docs/remote-access.md): Tailscale Funnel setup for non-LAN use. |
-| `examples/` | Optional, unmaintained examples. [`classic-avatar/`](examples/classic-avatar/): load the two-big-eyes face at runtime. [`cloudflare-relay/`](examples/cloudflare-relay/): Cloudflare Workers WebSocket relay for reaching the gateway from outside the local LAN. |
+| `examples/` | Optional, unmaintained examples. [`cloudflare-relay/`](examples/cloudflare-relay/): Cloudflare Workers WebSocket relay for reaching the gateway from outside the local LAN. |
 
 ## Target hardware
 
@@ -51,6 +51,8 @@ This repository is a monorepo.
 | `take_photo(question?)` | Capture a frame, save as JPEG, return the path + inline image block | ✅ |
 | `set_volume(volume)` | Speaker volume (0-100) | ✅ |
 | `set_brightness(brightness)` | Screen brightness (0-100) | ✅ |
+| `set_off_timeout(seconds)` | Persistent idle screen-off timeout (0..86400 seconds; default 300, 0 disables). Requires firmware 1.17.0+ | ✅ |
+| `get_off_timeout` | Read the persistent screen-off timeout and current screen state. Requires firmware 1.17.0+ | ✅ |
 | `move_head(yaw, pitch, speed?)` | Move the neck (servos). `pitch` is constrained to `5..85` — the M5Stack-recommended operating range. For the wider firmware hard clamp (`0..88`), use the firmware-side `set_head_angles` device tool instead. | ✅ |
 | `get_touch_state` | Touch sensor state (press / release / stroke / etc.) | ✅ |
 | `get_touch_sensor_enabled` | Read whether head-touch detection is enabled. The NVS-backed setting persists across reboot. | ✅ |
@@ -650,6 +652,67 @@ Or make it the default engine:
 export STACKCHAN_TTS_ENGINE=elevenlabs
 ```
 
+#### Alternative engine: Fish Audio
+
+[Fish Audio](https://fish.audio) is a hosted TTS service with strong
+English voices and user-trainable voice models, which makes it a
+practical alternative to VOICEVOX (Japanese-only by default) for English
+deployments.
+
+It is a **third-party cloud service**: the text passed to `say` leaves
+this machine and is sent to Fish Audio's servers to be synthesised.
+Review [Fish Audio's terms and pricing](https://fish.audio) before
+sending anything you would not want to share with them, and prefer a
+local engine such as VOICEVOX for sensitive utterances.
+
+Unlike Irodori, this engine needs **no audio decoder**: the Fish Audio
+API returns 16-bit mono PCM/WAV at a caller-chosen sample rate, and the
+engine asks for 16 kHz — exactly what the device's Opus decoder expects.
+So there is no `miniaudio` (Irodori) and no `ffmpeg` (Edge TTS)
+dependency, and the extra is a convenience alias over `[tts]`:
+
+```bash
+pip install 'stackchan-mcp[tts-fish-audio]'
+```
+
+The `mp3` and `opus` response formats are deliberately unsupported —
+consuming them would pull in a decoder purely to undo an encode we never
+needed.
+
+Carrying no decoder also means nothing downstream would notice a reply
+that is not audio, so the engine checks that itself: a `200` whose
+content type is missing or not audio, or whose body is not the format that was
+requested, is rejected rather than played, and a response shorter than
+its own WAV header promises — or a `pcm` body that is not a whole number
+of samples — is reported as truncated instead of quietly returning a
+clipped utterance.
+
+Configure via environment variables (the API key is read from the
+environment only — never commit it):
+
+| Environment variable | Default | Notes |
+|---|---|---|
+| `STACKCHAN_FISH_AUDIO_KEY` | _(required)_ | API key, sent as `Authorization: Bearer <key>`. Unset → the engine still lists but `say(voice="fish-audio")` returns a clear error. |
+| `STACKCHAN_FISH_AUDIO_MODEL` | _(none)_ | Default voice model ID (the API's `reference_id`). When unset the request omits it and Fish Audio uses its own default voice. |
+| `STACKCHAN_FISH_AUDIO_BACKEND` | `s2.1-pro` | Synthesis backend, sent as the `model` header. One of `s1`, `s2-pro`, `s2.1-pro`, `s2.1-pro-free`. |
+| `STACKCHAN_FISH_AUDIO_URL` | `https://api.fish.audio/v1/tts` | Endpoint override, for a proxy or a compatible self-hosted deployment. |
+
+Select Fish Audio per call:
+
+```
+say(text="Nice to meet you!", voice="fish-audio")
+```
+
+Or make it the default engine for every `say` call that omits `voice`:
+
+```bash
+export STACKCHAN_TTS_ENGINE=fish-audio
+```
+
+A per-call `speaker_name` overrides `STACKCHAN_FISH_AUDIO_MODEL`, so a
+single deployment can switch between trained voices without restarting
+the gateway.
+
 ### 5. Optional: STT setup (faster-whisper)
 
 To let the device hear, install one of the `[stt-*]` extras and pair
@@ -686,7 +749,6 @@ prerequisite as the `[tts]` extra).
 
 | Environment variable | Default | Notes |
 |---|---|---|
-| `STACKCHAN_LISTEN_LANGUAGE` | `ja` | Default `listen()` language when the tool call omits `language`. |
 | `STACKCHAN_FASTER_WHISPER_MODEL` | `base` | Model identifier — `tiny` / `base` / `small` / `medium` / `large-v3`. Larger models are more accurate but slower and use more memory. |
 | `STACKCHAN_FASTER_WHISPER_DEVICE` | `cpu` | `cpu` / `cuda` / `auto`. |
 | `STACKCHAN_FASTER_WHISPER_COMPUTE_TYPE` | `int8` | `int8` / `float16` / `float32`. |

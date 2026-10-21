@@ -26,7 +26,7 @@
 | `firmware/` | [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) フォーク全体（git subtree）。StackChan 用カスタムボードは `firmware/main/boards/stackchan/` に配置 |
 | `gateway/` | Python MCP ゲートウェイ。stdio MCP サーバー (LLM側) + WebSocket MCP クライアント (ESP32側) + HTTP capture サーバー |
 | `docs/` | [`first-run-from-factory.ja.md`](docs/first-run-from-factory.ja.md): 出荷時キット → 書き込み → Wi-Fi → Cursor。[`architecture.md`](docs/architecture.md): 全体構成図・ツール名マッピング・写真フロー・認証・Phase ロードマップ。[`firmware-sync.md`](docs/firmware-sync.md): upstream xiaozhi-esp32 同期手順。[`remote-access.md`](docs/remote-access.md): Tailscale Funnel による非LAN接続手順 |
-| `examples/` | オプションの非保守 example 群。[`classic-avatar/`](examples/classic-avatar/): ランタイムで大きな両目の顔を載せる。[`cloudflare-relay/`](examples/cloudflare-relay/): LAN 外から gateway へ届くための Cloudflare Workers WebSocket リレー |
+| `examples/` | オプションの非保守 example 群。[`cloudflare-relay/`](examples/cloudflare-relay/): LAN 外から gateway へ届くための Cloudflare Workers WebSocket リレー |
 
 ## 想定ハードウェア
 
@@ -51,6 +51,8 @@
 | `take_photo(question?)` | カメラ撮影 → JPEG 保存 → パス + インライン画像ブロック返す | ✅ |
 | `set_volume(volume)` | スピーカー音量 (0-100) | ✅ |
 | `set_brightness(brightness)` | 画面明るさ (0-100) | ✅ |
+| `set_off_timeout(seconds)` | 画面消灯までの無操作時間を保存 (0..86400 秒、既定 300、0 で無効化)。firmware 1.17.0 以降が必要 | ✅ |
+| `get_off_timeout` | 保存された消灯時間と現在の画面状態を取得。firmware 1.17.0 以降が必要 | ✅ |
 | `move_head(yaw, pitch, speed?)` | 首を動かす (サーボ)。`pitch` は M5Stack 推奨運用レンジ `5..85` に制限される。ファームウェア側のハードクランプ (`0..88`) を使いたい場合は、firmware-side の `set_head_angles` デバイスツールを利用する | ✅ |
 | `get_touch_state` | タッチセンサ状態 (press/release/stroke 等) | ✅ |
 | `get_touch_sensor_enabled` | 頭部タッチ検出が有効かどうかを取得。NVS に保存され、再起動後も維持される | ✅ |
@@ -585,6 +587,61 @@ say(text="Hello!", voice="elevenlabs", speaker_name="rachel")
 export STACKCHAN_TTS_ENGINE=elevenlabs
 ```
 
+#### 別エンジン: Fish Audio
+
+[Fish Audio](https://fish.audio) はホスト型の TTS サービスで、英語の
+声が強く、自分で学習させたボイスモデルも使えます。VOICEVOX（既定では
+日本語のみ）の代わりに、英語で使いたい場合の選択肢になります。
+
+これは **サードパーティのクラウドサービス** です。`say` に渡した
+テキストはこのマシンの外に出て、Fish Audio のサーバーで合成されます。
+共有したくない内容を送る前に
+[Fish Audio の利用規約と料金](https://fish.audio) を確認し、機密性の
+高い発話には VOICEVOX などのローカルエンジンを使ってください。
+
+Irodori と違い、このエンジンは **音声デコーダーが不要** です。Fish Audio
+API は呼び出し側が指定したサンプルレートで 16-bit モノラルの PCM/WAV を
+返し、エンジンはデバイスの Opus デコーダーが期待する 16 kHz を指定
+します。そのため `miniaudio`（Irodori）も `ffmpeg`（Edge TTS）も
+不要で、extra は `[tts]` への便宜的なエイリアスです:
+
+```bash
+pip install 'stackchan-mcp[tts-fish-audio]'
+```
+
+`mp3` と `opus` の応答形式は意図的に非対応です（使うと、不要になった
+エンコードを元に戻すためだけにデコーダーが必要になります）。
+
+デコーダーが無いため、音声ではない応答があっても後段では気づけません。
+そこでエンジン自身が確認します。`200` でも Content-Type が無い・空・
+音声ではない場合や、本文が要求した形式でない場合は再生せずに拒否します。
+WAV ヘッダーが宣言するより短い応答や、サンプル数が整数にならない `pcm`
+本文も、短く切れた発話を成功扱いにせず「途中で切れた」と報告します。
+
+環境変数で設定（API キーは環境変数からのみ読み取り — コミット厳禁）:
+
+| 環境変数 | デフォルト | 備考 |
+|---|---|---|
+| `STACKCHAN_FISH_AUDIO_KEY` | _(必須)_ | API キー。`Authorization: Bearer <key>` で送信。未設定でもエンジンは一覧に出ますが、`say(voice="fish-audio")` は分かりやすいエラーを返します |
+| `STACKCHAN_FISH_AUDIO_MODEL` | _(なし)_ | 既定のボイスモデル ID（API の `reference_id`）。未設定ならリクエストに含めず、Fish Audio 側の既定の声になります |
+| `STACKCHAN_FISH_AUDIO_BACKEND` | `s2.1-pro` | 合成バックエンド（`model` ヘッダーで送信）。`s1`・`s2-pro`・`s2.1-pro`・`s2.1-pro-free` のいずれか |
+| `STACKCHAN_FISH_AUDIO_URL` | `https://api.fish.audio/v1/tts` | エンドポイントの上書き（プロキシや互換のセルフホスト用） |
+
+呼び出しごとに Fish Audio を選択:
+
+```
+say(text="Nice to meet you!", voice="fish-audio")
+```
+
+`voice` を省略した `say` 全部の既定エンジンにする場合:
+
+```bash
+export STACKCHAN_TTS_ENGINE=fish-audio
+```
+
+呼び出しごとの `speaker_name` は `STACKCHAN_FISH_AUDIO_MODEL` を上書き
+するので、gateway を再起動せずに学習済みボイスを切り替えられます。
+
 ### 5. オプション: STT セットアップ (faster-whisper)
 
 デバイスに聞いてもらうには、`[stt-*]` extras のどれかをインストール
@@ -621,7 +678,6 @@ export OPENAI_API_KEY=sk-...
 
 | 環境変数 | デフォルト | 補足 |
 |---|---|---|
-| `STACKCHAN_LISTEN_LANGUAGE` | `ja` | `listen()` が `language` を省略したときのデフォルト言語 |
 | `STACKCHAN_FASTER_WHISPER_MODEL` | `base` | モデル識別子 — `tiny` / `base` / `small` / `medium` / `large-v3`。大きいモデルほど精度は上がるが、メモリ消費と推論時間も増える |
 | `STACKCHAN_FASTER_WHISPER_DEVICE` | `cpu` | `cpu` / `cuda` / `auto` |
 | `STACKCHAN_FASTER_WHISPER_COMPUTE_TYPE` | `int8` | `int8` / `float16` / `float32` |
