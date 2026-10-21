@@ -32,6 +32,15 @@ documented-only.
 
 ### Gateway
 
+- Reload a configured avatar set on every ESP32 connect via
+  `STACKCHAN_AVATAR_SET_PATH` (optional `STACKCHAN_AVATAR_SET_MODE` /
+  `STACKCHAN_AVATAR_SET_TIMEOUT`). Custom faces live in PSRAM, so this
+  is what brings them back after a robot reboot without a manual
+  `load_avatar_set`. Mode is inferred only from an exact layered or
+  matrix file size; unknown sizes fail closed unless mode is set.
+  **Behavior change:** when an avatar set is configured, the same hook
+  re-enables autonomous blink on that device (firmware starts with blink
+  off). Blink is not forced on when `STACKCHAN_AVATAR_SET_PATH` is unset.
 - New `fish-audio` TTS engine backed by the hosted
   [Fish Audio](https://fish.audio) API, selectable per call with
   `say(voice="fish-audio")` or globally via
