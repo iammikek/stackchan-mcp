@@ -48,6 +48,8 @@ documented-only.
   `resolve_listen_language` with no argument: `STACKCHAN_LISTEN_LANGUAGE`,
   otherwise `ja`, the same default as `listen()` when `language` is
   omitted.
+- Tests only: merge the duplicated `move_head` pitch-rejection tests into one
+  parametrized test (same boundaries and type cases; no runtime change). (#421)
 
 ## [0.19.0] - 2026-10-22
 
