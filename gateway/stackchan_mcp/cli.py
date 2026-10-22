@@ -65,6 +65,9 @@ Environment variables:
   STACKCHAN_AVATAR_SET_TIMEOUT
                            Seconds to wait for the device fetch
                            (default 180 matrix / 60 layered).
+  STACKCHAN_LISTEN_LANGUAGE
+                           Default listen() language when the call
+                           omits language (default ja).
   HOST                     Bind address for the ESP32 WebSocket server
                            (default 0.0.0.0).
   WS_PORT                  Port for the ESP32 WebSocket server

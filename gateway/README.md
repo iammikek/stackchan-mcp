@@ -73,6 +73,10 @@ Edit `.env`:
   skipped. `STACKCHAN_AVATAR_SET_TIMEOUT` defaults to 180 s for matrix
   and 60 s for layered. When this path is set, the same connect hook
   also re-enables autonomous blink (firmware starts with blink off).
+- `STACKCHAN_LISTEN_LANGUAGE`: default `listen()` language when the tool
+  call omits `language` (falls back to `ja`). The MCP schema does not
+  advertise a language default. `STACKCHAN_FASTER_WHISPER_*` select the
+  local model; install the `[stt-faster-whisper]` extra.
 
 ## Run
 

@@ -45,6 +45,20 @@ documented-only.
   **Behavior change:** when an avatar set is configured, the same hook
   re-enables autonomous blink on that device (firmware starts with blink
   off). Blink is not forced on when `STACKCHAN_AVATAR_SET_PATH` is unset.
+- Tests only: merge the duplicated `move_head` pitch-rejection tests into one
+  parametrized test (same boundaries and type cases; no runtime change). (#421)
+
+## [0.19.0] - 2026-10-22
+
+### Gateway
+
+- Bump the locked `certifi` to 2026.10.19, which drops the
+  `emSign ECC Root CA - G3` root after the eMudhra intermediate CA key
+  compromise (October 2026).
+- `listen()` honours `STACKCHAN_LISTEN_LANGUAGE` when the tool call
+  omits `language` (still `ja` when unset). The MCP `listen` schema no
+  longer advertises a `language` default, so clients that materialize
+  schema defaults do not override the env.
 - New `fish-audio` TTS engine backed by the hosted
   [Fish Audio](https://fish.audio) API, selectable per call with
   `say(voice="fish-audio")` or globally via
@@ -70,6 +84,16 @@ documented-only.
   to the device's `self.power.*` tools. Requires a firmware that includes the
   persistent charge protection below.
 
+### Compatibility and known limitations
+
+- Recommended pairing: gateway **0.19.0** with firmware **1.18.0**.
+  The charge-protection tools need firmware 1.18.0 or later; everything else
+  in this release works with firmware 1.17.0.
+- Audio recording (`listen`) is still one gateway-wide slot across devices
+  (see the multi-device entry above).
+
+## [firmware-v1.18.0] - 2026-10-22
+
 ### Firmware
 
 - Added a persistent, opt-in runtime toggle for the AXP2101 charge protection
@@ -83,6 +107,56 @@ documented-only.
   on re-evaluates the current battery level at once. New device tools
   `self.power.set_charge_protection`, `self.power.get_charge_protection`,
   `self.power.set_charge_thresholds`.
+- Reworked head-touch (Si12T) detection to stop phantom STROKE events on an
+  untouched head (#103) and to catch short taps (#2):
+  - The chip is now soft-reset and configured per the datasheet on every
+    boot (SRST, CH1-3 enabled, baseline reset released, registers read back
+    and logged). Previously the ESP32 reset left whatever baseline the chip
+    already held, and CH2/CH3 were often "pressed" from power-up.
+  - TAP / STROKE are decided by finger movement, not hold time. STROKE means
+    the finger slid from the zone it started on to another zone, or the
+    level-weighted centre of the touched zones moved by one zone or more (a
+    wide, fast finger never fully leaves its start zone); TAP is a
+    100..500 ms press with no movement that reached level M or lasted
+    300 ms or more (a one-tick spike or a lone short level-L blip is dropped).
+    While the screen is off, a press that started asleep must reach level H to
+    count as a TAP and wake the screen: on a still, untouched head the sensor
+    shows short bursts of L/M readings across several channels (measured up to
+    ~18 per minute with the screen off) and none of them reaches H. A hand resting on the head, or a
+    channel stuck "pressed", no longer produces events. A channel that stays
+    non-zero for 15 s has its baseline reset on the chip and is ignored until
+    it reads 0 again. The first 10 s after boot (the chip's fast-calibration
+    window) never produce events. A level-L blip shorter than 300 ms is not a
+    TAP. When charging or the backlight switches, power-rail changes make a
+    single channel flicker for up to ~1 s, so for 1 s a press that starts
+    inside the window can only end as a STROKE (a finger sliding across
+    zones; a stationary press is dropped), a press already on is tracked as
+    usual, and the chip baseline is reset once the window is over (after a
+    finger that is really on the pad lets go).
+  - Polling is now every 50 ms (was 100 ms) and the screen-off timer is only
+    woken by a confirmed TAP/STROKE, so a stuck channel can no longer keep the
+    display on. Face reactions are shorter (TAP 1.2 s, STROKE 1.5 s).
+  - `get_touch_state` also reports `enabled`, `masked`, `recalibrations`, and
+    `boot_grace`. The event sent to the gateway keeps its shape
+    (`touch` / `tap|stroke` / `duration_ms`); a STROKE `duration_ms` is now
+    the length of the press in which the finger moved.
+  - **Behavior change:** head-touch stays **on when `touch/enabled` was never
+    saved**, as before (`set_touch_sensor_enabled(false)` still turns it off and
+    a saved value is kept as is), but with the default settings the robot now
+    reacts differently: the chip is always re-initialised at boot, resting
+    hands and stuck channels no longer count, very short or weak touches are
+    dropped, and while the screen is off only a firm touch (level H) wakes it.
+
+### Compatibility and known limitations
+
+- Recommended pairing: firmware **1.18.0** with gateway **0.19.0**.
+  Firmware 1.18.0 also works with gateway 0.18.0, but the charge-protection
+  controls are only reachable through gateway 0.19.0.
+- Charge protection stays **off** until enabled; existing devices behave
+  as before. Head-touch keeps its `touch/enabled` setting, but see the
+  behavior change above for how the default settings now react.
+- Existing devices should use the app-only `xiaozhi.bin` update at `0x20000`
+  to preserve NVS/Wi-Fi configuration.
 
 ## [0.18.0] - 2026-10-03
 
@@ -1972,7 +2046,9 @@ uv tool install stackchan-mcp
   alias, so the previous floating pin no longer resolved. ([#47])
 
 
-[Unreleased]: https://github.com/kisaragi-mochi/stackchan-mcp/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/kisaragi-mochi/stackchan-mcp/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/kisaragi-mochi/stackchan-mcp/compare/v0.18.0...v0.19.0
+[firmware-v1.18.0]: https://github.com/kisaragi-mochi/stackchan-mcp/compare/firmware-v1.17.0...firmware-v1.18.0
 [0.18.0]: https://github.com/kisaragi-mochi/stackchan-mcp/compare/v0.17.0...v0.18.0
 [firmware-v1.17.0]: https://github.com/kisaragi-mochi/stackchan-mcp/compare/firmware-v1.16.0...firmware-v1.17.0
 [0.17.0]: https://github.com/kisaragi-mochi/stackchan-mcp/compare/v0.16.0...v0.17.0
