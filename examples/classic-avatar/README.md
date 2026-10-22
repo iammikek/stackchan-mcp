@@ -4,9 +4,6 @@ Procedural 90-frame matrix (6 faces × 3 eyes × 5 mouths) in the official
 black-screen, two-big-eyes style. Load it at runtime with `load_avatar_set`.
 No firmware rebuild.
 
-For the full factory-kit → gateway → Cursor path, see
-[docs/first-run-from-factory.md](../../docs/first-run-from-factory.md).
-
 The generator is the source of truth. The RGB565 payload and PNG previews
 are build outputs and are gitignored.
 
@@ -21,6 +18,9 @@ Writes `classic-matrix.rgb565` (3,456,000 bytes) and preview PNGs under `png/`.
 ## Load onto a connected device
 
 Gateway must be running (`http://127.0.0.1:8767/mcp`) and the robot connected.
+If the gateway was started with `STACKCHAN_TOKEN` (or the legacy
+`BEARER_TOKEN`), export that same value first. The loader sends it as
+`Authorization: Bearer …` and does not print it.
 
 ```bash
 uv run --with pillow python examples/classic-avatar/load_classic.py
@@ -33,7 +33,10 @@ you load it again.
 
 Point the gateway at the built file so it reloads after hello — including
 reconnects while the gateway is already running. When this path is set,
-the same hook turns blink back on (firmware starts with blink off):
+the same hook turns blink back on (firmware starts with blink off).
+The built-in idle face shows as soon as the device is ready. The classic
+face replaces it when the transfer finishes; a missing file or a timeout
+leaves the built-in face in place.
 
 ```bash
 export STACKCHAN_AVATAR_SET_PATH="$PWD/examples/classic-avatar/classic-matrix.rgb565"

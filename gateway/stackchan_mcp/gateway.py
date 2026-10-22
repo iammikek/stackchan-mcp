@@ -385,10 +385,13 @@ class Gateway:
         Custom sets live in PSRAM and vanish on reboot. This hook runs
         on connect — including reconnect after the gateway was already
         up — so the configured face comes back without a manual
-        ``load_avatar_set``. Failures are logged and do not block idle
-        render or the rest of device init. When an avatar set is
-        configured, blink is also re-enabled on that device after the
-        load attempt (firmware starts with blink off).
+        ``load_avatar_set``. The manager runs it in the background, so
+        the built-in idle face and ``ESP32 ready`` are not held for the
+        transfer. After a successful load the idle face is rendered
+        again from the new set. Failures are logged. When an avatar set
+        is configured, blink is also re-enabled on that device after the
+        load attempt (firmware starts with blink off). A replaced or
+        disconnected socket does not receive the late blink or re-render.
         """
         config = resolve_configured_avatar_set()
         if config is None:
@@ -406,13 +409,64 @@ class Gateway:
             config["timeout"],
             device_id=device_id,
         )
+        if not self._autoload_still_current(_connection, device_id):
+            logger.info(
+                "auto-loading avatar set abandoned: device=%s",
+                device_id,
+            )
+            return
         if not result.get("ok"):
             logger.warning(
                 "auto-loading avatar set failed: device=%s error=%s",
                 device_id,
                 result.get("error", result),
             )
+        else:
+            await self._rerender_idle_after_autoload(device_id)
+            if not self._autoload_still_current(_connection, device_id):
+                logger.info(
+                    "auto-loading avatar set abandoned: device=%s",
+                    device_id,
+                )
+                return
         await self._enable_connect_blink(device_id)
+
+    def _autoload_still_current(
+        self, connection: ESP32Connection, device_id: str
+    ) -> bool:
+        """False once this socket has been replaced or disconnected.
+
+        Fakes that do not track connections are treated as still current
+        so direct unit tests of this hook keep working.
+        """
+        check = getattr(self.esp32, "connection_is_current", None)
+        if check is None:
+            return True
+        return bool(check(connection, device_id))
+
+    async def _rerender_idle_after_autoload(self, device_id: str) -> None:
+        """Show the custom idle face after a successful background load."""
+        try:
+            _result, error = await self.esp32.call_tool(
+                "self.display.set_avatar",
+                {"face": "idle"},
+                device_id=device_id,
+            )
+        except Exception as exc:
+            logger.warning(
+                "re-rendering idle after avatar autoload failed: "
+                "device=%s error=%s",
+                device_id,
+                exc,
+            )
+            return
+        if error:
+            logger.warning(
+                "re-rendering idle after avatar autoload failed: "
+                "device=%s error=%s",
+                device_id,
+                error,
+            )
 
     async def _enable_connect_blink(self, device_id: str) -> None:
         """Turn autonomous blink on after a configured avatar-set autoload."""

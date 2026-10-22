@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -15,8 +17,16 @@ MCP = "http://127.0.0.1:8767/mcp"
 SESSION = "mcp-session-id"
 
 
+def gateway_token() -> str:
+    """Same token the gateway accepts on its HTTP MCP endpoint."""
+    return (os.getenv("STACKCHAN_TOKEN") or os.getenv("BEARER_TOKEN") or "").strip()
+
+
 def req(payload: dict, session: str | None = None, timeout: float = 200) -> tuple[dict, bytes]:
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
+    token = gateway_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     if session:
         headers[SESSION] = session
     request = urllib.request.Request(
@@ -24,8 +34,18 @@ def req(payload: dict, session: str | None = None, timeout: float = 200) -> tupl
     )
     for key, value in headers.items():
         request.add_header(key, value)
-    with urllib.request.urlopen(request, timeout=timeout) as resp:
-        return dict(resp.headers), resp.read()
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:
+            return dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            print(
+                "gateway returned HTTP 401. Export the same STACKCHAN_TOKEN "
+                "(or BEARER_TOKEN) the gateway was started with.",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from None
+        raise
 
 
 def result_text(raw: bytes) -> str:

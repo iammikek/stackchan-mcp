@@ -505,10 +505,10 @@ def test_resolve_configured_avatar_set_fails_closed_when_missing_without_mode(
 
 class _BlinkEsp32:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, dict]] = []
+        self.calls: list[tuple[str, dict, str | None]] = []
 
     async def call_tool(self, name: str, arguments: dict, device_id: str | None = None):
-        self.calls.append((name, arguments))
+        self.calls.append((name, arguments, device_id))
         return {"ok": True}, None
 
 
@@ -559,7 +559,9 @@ async def test_autoload_configured_avatar_set_loads_and_logs_failure(
     assert calls == [(str(archive), "matrix", 120.0, "device-test")]
     assert "auto-loading avatar set failed" in caplog.text
     assert "device_timeout" in caplog.text
-    assert gw.esp32.calls == [("self.display.set_blink", {"enabled": True})]
+    assert gw.esp32.calls == [
+        ("self.display.set_blink", {"enabled": True}, "device-test")
+    ]
 
 
 @pytest.mark.asyncio
@@ -576,12 +578,19 @@ async def test_autoload_blink_failure_does_not_raise(monkeypatch, tmp_path, capl
         return {"ok": True}
 
     class BoomEsp32:
-        async def call_tool(self, _name: str, _arguments: dict, device_id: str | None = None):
-            raise RuntimeError("no device")
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        async def call_tool(self, name: str, _arguments: dict, device_id: str | None = None):
+            self.calls.append(name)
+            if name == "self.display.set_blink":
+                raise RuntimeError("no device")
+            return {"ok": True}, None
 
     gw.load_avatar_set = fake_load  # type: ignore[method-assign]
     gw.esp32 = BoomEsp32()  # type: ignore[assignment]
     caplog.set_level("WARNING")
     await gw._autoload_configured_avatar_set(None, "device-test")  # type: ignore[arg-type]
+    assert gw.esp32.calls == ["self.display.set_avatar", "self.display.set_blink"]
     assert "auto-enabling blink failed" in caplog.text
     assert "no device" in caplog.text

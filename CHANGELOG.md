@@ -38,6 +38,10 @@ documented-only.
   is what brings them back after a robot reboot without a manual
   `load_avatar_set`. Mode is inferred only from an exact layered or
   matrix file size; unknown sizes fail closed unless mode is set.
+  The transfer runs in the background: the built-in idle face and the
+  ready log are not held for the fetch timeout. After a successful load
+  the idle face is rendered again from the new set. The task is cancelled
+  if that device disconnects, is replaced, or the gateway shuts down.
   **Behavior change:** when an avatar set is configured, the same hook
   re-enables autonomous blink on that device (firmware starts with blink
   off). Blink is not forced on when `STACKCHAN_AVATAR_SET_PATH` is unset.

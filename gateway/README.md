@@ -66,6 +66,8 @@ Edit `.env`:
   set.
 - `STACKCHAN_AVATAR_SET_PATH`: optional local RGB565 file. Reloaded after
   every ESP32 hello so a PSRAM custom face comes back after reboot.
+  The transfer does not delay the built-in idle face; that face is
+  drawn again from the new set once the load succeeds.
   `STACKCHAN_AVATAR_SET_MODE` (`layered` / `matrix`) is required unless
   the file size matches layered or matrix exactly; unknown sizes are
   skipped. `STACKCHAN_AVATAR_SET_TIMEOUT` defaults to 180 s for matrix
